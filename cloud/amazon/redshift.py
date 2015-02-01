@@ -221,10 +221,8 @@ except:
 
 
 def _collect_facts(resource):
-    """
-    Transfrom cluster inforamtion to dict.
-    """
-    d = {
+    """Transfrom cluster information to dict."""
+    facts = {
         'identifier'        : resource['ClusterIdentifier'],
         'create_time'       : resource['ClusterCreateTime'],
         'status'            : resource['ClusterStatus'],
@@ -236,10 +234,10 @@ def _collect_facts(resource):
 
     for node in resource['ClusterNodes']:
         if node['NodeRole'] in ('SHARED', 'LEADER'):
-            d['private_ip_address'] = node['PrivateIPAddress']
+            facts['private_ip_address'] = node['PrivateIPAddress']
             break
 
-    return d
+    return facts
 
 
 def create_cluster(module, redshift):
@@ -273,16 +271,16 @@ def create_cluster(module, redshift):
         try:
             redshift.create_cluster(identifier, node_type, username, password, **params)
         except boto.exception.JSONResponseError, e:
-            # This won't produce a message, until this error
+            # FIXME: Change this to just set the error message when
             # https://github.com/boto/boto/issues/2776 is fixed.
-            module.fail_json(msg = e.error_message)
+            module.fail_json(msg = str(e))
 
     try:
         resource = redshift.describe_clusters(identifier)['DescribeClustersResponse']['DescribeClustersResult']['Clusters'][0]
     except boto.exception.JSONResponseError, e:
-        # This won't produce a message, until this error
+        # FIXME: Change this to just set the error message when
         # https://github.com/boto/boto/issues/2776 is fixed.
-        module.fail_json(msg = e.error_message)
+        module.fail_json(msg = str(e))
 
     if wait:
         try:
@@ -297,9 +295,9 @@ def create_cluster(module, redshift):
                 resource = redshift.describe_clusters(identifier)['DescribeClustersResponse']['DescribeClustersResult']['Clusters'][0]
 
         except boto.exception.JSONResponseError, e:
-            # This won't produce a message, until this error
+            # FIXME: Change this to just set the error message when
             # https://github.com/boto/boto/issues/2776 is fixed.
-            module.fail_json(msg = e.error_message)
+            module.fail_json(msg = str(e))
 
     return(changed, _collect_facts(resource))
 
@@ -312,9 +310,9 @@ def describe_cluster(module, redshift):
     try:
         resource = redshift.describe_clusters(identifier)['DescribeClustersResponse']['DescribeClustersResult']['Clusters'][0]
     except boto.exception.JSONResponseError, e:
-        # This won't produce a message, until this error
+        # FIXME: Change this to just set the error message when
         # https://github.com/boto/boto/issues/2776 is fixed.
-        module.fail_json(msg = 'Redshift cluster %s does not exist' % identifier)
+        module.fail_json(msg = str(e))
 
     return(True, _collect_facts(resource))
 
@@ -334,9 +332,9 @@ def delete_cluster(module, redshift):
     try:
         redshift.delete_custer( identifier )
     except boto.exception.JSONResponseError, e:
-        # This won't produce a message, until this error
+        # FIXME: Change this to just set the error message when
         # https://github.com/boto/boto/issues/2776 is fixed.
-        module.fail_json(msg = e.error_message)
+        module.fail_json(msg = str(e))
 
     if wait:
         try:
@@ -351,9 +349,9 @@ def delete_cluster(module, redshift):
                 resource = redshift.describe_clusters(identifier)['DescribeClustersResponse']['DescribeClustersResult']['Clusters'][0]
 
         except boto.exception.JSONResponseError, e:
-            # This won't produce a message, until this error
+            # FIXME: Change this to just set the error message when
             # https://github.com/boto/boto/issues/2776 is fixed.
-            module.fail_json(msg = e.error_message)
+            module.fail_json(msg = str(e))
 
     return(True, {})
 
@@ -384,16 +382,16 @@ def modify_cluster(module, redshift):
         try:
             redshift.modify_cluster(identifier, **params)
         except boto.exception.JSONResponseError, e:
-            # This won't produce a message, until this error
+            # FIXME: Change this to just set the error message when
             # https://github.com/boto/boto/issues/2776 is fixed.
-            module.fail_json(msg = e.error_message)
+            module.fail_json(msg = str(e))
 
     try:
         resource = redshift.describe_clusters(identifier)['DescribeClustersResponse']['DescribeClustersResult']['Clusters'][0]
     except boto.exception.JSONResponseError, e:
-        # This won't produce a message, until this error
+        # FIXME: Change this to just set the error message when
         # https://github.com/boto/boto/issues/2776 is fixed.
-        module.fail_json(msg = e.error_message)
+        module.fail_json(msg = str(e))
 
     if wait:
         try:
@@ -408,9 +406,9 @@ def modify_cluster(module, redshift):
                 resource = redshift.describe_clusters(identifier)['DescribeClustersResponse']['DescribeClustersResult']['Clusters'][0]
 
         except boto.exception.JSONResponseError, e:
-            # This won't produce a message, until this error
+            # FIXME: Change this to just set the error message when
             # https://github.com/boto/boto/issues/2776 is fixed.
-            module.fail_json(msg = e.error_message)
+            module.fail_json(msg = str(e))
 
     return(True, _collect_facts(resource))
 
@@ -459,9 +457,9 @@ def main():
     try:
         conn = connect_to_aws(boto.redshift, region, **aws_connect_params)
     except boto.exception.JSONResponseError, e:
-        # This won't produce a message, until this error
+        # FIXME: Change this to just set the error message when
         # https://github.com/boto/boto/issues/2776 is fixed.
-        module.fail_json(msg = e.error_message)
+        module.fail_json(msg = str(e))
 
     changed = True
     if command == 'create':
