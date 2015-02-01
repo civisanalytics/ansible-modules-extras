@@ -101,10 +101,10 @@ def main():
     )
     module = AnsibleModule(argument_spec=argument_spec)
 
-    state               = module.params.get('state')
-    group_name          = module.params.get('name')
-    group_description   = module.params.get('description')
-    group_subnets       = module.params.get('subnets')
+    state             = module.params.get('state')
+    group_name        = module.params.get('name')
+    group_description = module.params.get('description')
+    group_subnets     = module.params.get('subnets')
 
     if state == 'present':
         for required in ('name', 'description', 'subnets'):
