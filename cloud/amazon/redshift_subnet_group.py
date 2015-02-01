@@ -151,6 +151,7 @@ def main():
                 new_group = conn.create_cluster_subnet_group(group_name, group_description, group_subnets)
             else:
                 changed_group = conn.modify_cluster_subnet_group(group_name, group_subnets, description=group_description)
+            changed = True
 
     except boto.exception.JSONResponseError, e:
         # This won't produce a message, until this error
