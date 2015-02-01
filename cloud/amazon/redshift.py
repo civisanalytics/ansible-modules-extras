@@ -220,18 +220,18 @@ except:
     sys.exit(1)
 
 
-def _collect_facts( resource ):
+def _collect_facts(resource):
     """
     Transfrom cluster inforamtion to dict.
     """
     d = {
-        'identifier'            : resource['ClusterIdentifier'],
-        'create_time'           : resource['ClusterCreateTime'],
-        'status'                : resource['ClusterStatus'],
-        'username'              : resource['MasterUsername'],
-        'db_name'               : resource['DBName'],
-        'availability_zone'     : resource['AvailabilityZone'],
-        'maintenance_window'    : resource['PreferredMaintenanceWindow'],
+        'identifier'        : resource['ClusterIdentifier'],
+        'create_time'       : resource['ClusterCreateTime'],
+        'status'            : resource['ClusterStatus'],
+        'username'          : resource['MasterUsername'],
+        'db_name'           : resource['DBName'],
+        'availability_zone' : resource['AvailabilityZone'],
+        'maintenance_window': resource['PreferredMaintenanceWindow'],
     }
 
     for node in resource['ClusterNodes']:
@@ -252,12 +252,12 @@ def create_cluster(module, redshift):
     Returns:
     """
 
-    identifier      = module.params.get('identifier')
-    node_type       = module.params.get('node_type')
-    username        = module.params.get('username')
-    password        = module.params.get('password')
-    wait            = module.params.get('wait')
-    wait_timeout    = module.params.get('wait_timeout')
+    identifier   = module.params.get('identifier')
+    node_type    = module.params.get('node_type')
+    username     = module.params.get('username')
+    password     = module.params.get('password')
+    wait         = module.params.get('wait')
+    wait_timeout = module.params.get('wait_timeout')
 
     changed = True
     # Package up the optional parameters
@@ -301,7 +301,7 @@ def create_cluster(module, redshift):
             # https://github.com/boto/boto/issues/2776 is fixed.
             module.fail_json(msg = e.error_message)
 
-    return( changed, _collect_facts( resource ) )
+    return(changed, _collect_facts(resource))
 
 
 def describe_cluster(module, redshift):
@@ -316,7 +316,7 @@ def describe_cluster(module, redshift):
         # https://github.com/boto/boto/issues/2776 is fixed.
         module.fail_json(msg = 'Redshift cluster %s does not exist' % identifier)
 
-    return( True, _collect_facts( resource ) )
+    return(True, _collect_facts(resource))
 
 
 def delete_cluster(module, redshift):
@@ -327,9 +327,9 @@ def delete_cluster(module, redshift):
     redshift: authenticated redshift connection object
     """
 
-    identifier      = module.params.get('identifier')
-    wait            = module.params.get('wait')
-    wait_timeout    = module.params.get('wait_timeout')
+    identifier   = module.params.get('identifier')
+    wait         = module.params.get('wait')
+    wait_timeout = module.params.get('wait_timeout')
 
     try:
         redshift.delete_custer( identifier )
@@ -355,7 +355,7 @@ def delete_cluster(module, redshift):
             # https://github.com/boto/boto/issues/2776 is fixed.
             module.fail_json(msg = e.error_message)
 
-    return( True, {} )
+    return(True, {})
 
 
 def modify_cluster(module, redshift):
@@ -367,9 +367,9 @@ def modify_cluster(module, redshift):
 
     """
 
-    identifier      = module.params.get('identifier')
-    wait            = module.params.get('wait')
-    wait_timeout    = module.params.get('wait_timeout')
+    identifier   = module.params.get('identifier')
+    wait         = module.params.get('wait')
+    wait_timeout = module.params.get('wait_timeout')
 
     # Package up the optional parameters
     params = {}
@@ -412,7 +412,7 @@ def modify_cluster(module, redshift):
             # https://github.com/boto/boto/issues/2776 is fixed.
             module.fail_json(msg = e.error_message)
 
-    return( True, _collect_facts( resource ) )
+    return(True, _collect_facts(resource))
 
 
 def main():
