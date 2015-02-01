@@ -119,13 +119,13 @@ def main():
     if not region:
         module.fail_json(msg = str("region not specified and unable to determine region from EC2_REGION."))
 
-    # connect to the redshift endpoint
+    # Connect to the Redshift endpoint.
     try:
         conn = connect_to_aws(boto.redshift, region, **aws_connect_params)
     except boto.exception.JSONResponseError, e:
-        # This won't produce a message, until this error
+        # FIXME: Change this to just set the error message when
         # https://github.com/boto/boto/issues/2776 is fixed.
-        module.fail_json(msg = e.error_message)
+        module.fail_json(msg = str(e))
 
     try:
         changed = False
@@ -139,7 +139,7 @@ def main():
             # https://github.com/boto/boto/issues/2776 is fixed.
             if e.body.find('ClusterSubnetGroupNotFoundFault') == -1:
             #if e.code != 'ClusterSubnetGroupNotFoundFault':
-                module.fail_json(msg = e.error_message)
+                module.fail_json(msg = str(e))
 
         if state == 'absent':
             if exists:
@@ -154,9 +154,9 @@ def main():
             changed = True
 
     except boto.exception.JSONResponseError, e:
-        # This won't produce a message, until this error
+        # FIXME: Change this to just set the error message when
         # https://github.com/boto/boto/issues/2776 is fixed.
-        module.fail_json(msg = e.error_message)
+        module.fail_json(msg = str(e))
 
     module.exit_json(changed=changed)
 
