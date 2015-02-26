@@ -137,7 +137,7 @@ def main():
         except boto.exception.JSONResponseError, e:
             # This is a workaround, until this error
             # https://github.com/boto/boto/issues/2776 is fixed.
-            if e.body.find('ClusterSubnetGroupNotFoundFault') == -1:
+            if e.body['Error']['Code'] != 'ClusterSubnetGroupNotFoundFault'):
             #if e.code != 'ClusterSubnetGroupNotFoundFault':
                 module.fail_json(msg = str(e))
 
