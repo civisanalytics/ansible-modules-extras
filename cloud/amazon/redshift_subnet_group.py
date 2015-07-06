@@ -17,37 +17,34 @@
 
 DOCUMENTATION = '''
 ---
+author: '"Jens Carl (@j-carl)", Hothead Games Inc.'
 module: redshift_subnet_group
 short_description: mange Redshift cluster subnet groups
 description:
-    - Create, modifies, and deletes Redshift cluster subnet groups. This module has a dependency on python-boto.
-
+    - Create, modifies, and deletes Redshift cluster subnet groups.
 options:
   state:
     description:
       - Specifies whether the subnet should be present or absent.
-    required: true
-    default: present
-    aliases: []
+    default: 'present'
     choices: ['present', 'absent' ]
-  name:
+  group_name:
     description:
       - Cluster subnet group name.
     required: true
-    default: null
-    aliases: []
-  description:
+    aliases: ['name']
+  group_description:
     description:
       - Database subnet group description.
     required: false
     default: null
-    aliases: []
-  subnets:
+    aliases: ['description']
+  group_subnets:
     description:
       - List of subnet IDs that make up the cluster subnet group.
     required: false
     default: null
-    aliases: []
+    aliases: ['subnets']
   aws_secret_key:
     description:
       - AWS secret key. If not set then the value of the AWS_SECRET_KEY environment variable is used.
@@ -61,7 +58,6 @@ options:
     default: null
     aliases: [ 'ec2_access_key', 'access_key' ]
 requirements: [ 'boto' ]
-author: Jens Carl, Hothead Games Inc.
 '''
 
 EXAMPLES = '''
@@ -69,49 +65,52 @@ EXAMPLES = '''
 - local_action:
     module: redshift_subnet_group
     state: present
-    name: redshift-subnet
-    description: Redshift subnet
-    subnets:
+    group_name: redshift-subnet
+    group_description: Redshift subnet
+    group_subnets:
         - 'subnet-aaaaa'
         - 'subnet-bbbbb'
 
 # Remove subnet group
 redshift_subnet_group: >
     state: absent
-    name: redshift-subnet
+    group_name: redshift-subnet
 '''
 
-import sys
 
 try:
-    import boto.redshift
+    import boto
+    from boto import redshift
+    HAS_BOTO = True
 except ImportError:
-    print "failed=True msg='boto required for this module'"
-    sys.exit(1)
+    HAS_BOTO = False
 
 
 def main():
     argument_spec = ec2_argument_spec()
     argument_spec.update(dict(
-            state       = dict(required=True, choices=['present', 'absent']),
-            name        = dict(required=True),
-            description = dict(required=False),
-            subnets     = dict(required=False, type='list'),
+            state             = dict(required=True, choices=['present', 'absent']),
+            group_name        = dict(required=True, aliases=['name']),
+            group_description = dict(required=False, aliases=['description']),
+            group_subnets     = dict(required=False, aliases=['subnets'], type='list'),
         )
     )
     module = AnsibleModule(argument_spec=argument_spec)
 
+    if not HAS_BOTO:
+        module.fail_json(msg='boto v2.9.0+ required for this module')
+
     state             = module.params.get('state')
-    group_name        = module.params.get('name')
-    group_description = module.params.get('description')
-    group_subnets     = module.params.get('subnets')
+    group_name        = module.params.get('group_name')
+    group_description = module.params.get('group_description')
+    group_subnets     = module.params.get('group_subnets')
 
     if state == 'present':
-        for required in ('name', 'description', 'subnets'):
+        for required in ('group_name', 'group_description', 'group_subnets'):
             if not module.params.get( required ):
                 module.fail_json(msg = str("parameter %s required for state='present'" % required))
     else:
-        for not_allowed in ('description', 'subnets'):
+        for not_allowed in ('group_description', 'group_subnets'):
             if module.params.get( not_allowed ):
                 module.fail_json(msg = str("parameter %s not allowed for state='absent'" % not_allowed))
 
@@ -164,4 +163,5 @@ def main():
 from ansible.module_utils.basic import *
 from ansible.module_utils.ec2 import *
 
-main()
+if __name__ == '__main__':
+    main()
