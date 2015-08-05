@@ -17,43 +17,39 @@
 
 DOCUMENTATION = '''
 ---
+author: '"Jens Carl (@j-carl), Hothead Games Inc.'"
 module: redshift
 short_description: create, delete, or modify an Amazon redshift instance
 description:
-    - Creates, deletes, or modifies redshift instances.
+    - Creates, deletes, or modifies amazon Redshift cluster instances.
 options:
   command:
     description:
       - Specifies the action to take.
     required: true
     default: null
-    aliases: []
     choices: [ 'create', 'facts', 'delete', 'modify' ]
   identifier:
     description:
       - Redshift cluster identifier.
     required: true
     default: null
-    aliases: []
   node_type:
     description:
       - The node type of the cluster. Must be specified when command=create.
     required: true
     default: null
-    aliases: []
     choices: ['dw1.xlarge', 'dw1.8xlarge', 'dw2.large', 'dw2.8xlarge', ]
   username:
     description:
       - Master database username. Used only when command=create.
     required: true
     default: null
-    aliases: []
   password:
     description:
       - Master database password. Used only when command=create.
     required: true
     default: null
-    aliases: []
   cluster_type:
     description:
       - The type of cluster.
@@ -65,39 +61,32 @@ options:
       - Name of the database.
     required: False
     default: null
-    aliases: []
   availability_zone:
     description:
       - availability zone in which to launch cluster
     required: false
-    default: null
     aliases: ['zone', 'aws_zone']
   number_of_nodes:
     description:
       - Number of nodes. Only used when cluster_type=multi-node.
     required: false
     default: null
-    choices: []
   cluster_subnet_group_name:
     description:
       - which subnet to place the cluster
     required: false
-    default: null
     aliases: ['subnet']
-    choices: []
   cluster_security_groups:
     description:
       - in which security group the cluster belongs
     required: false
     default: null
     aliases: ['security_groups']
-    choices: []
   vpc_security_group_ids:
     description:
       - VPC security group
     required: false
     aliases: ['vpc_security_groups']
-    choices: []
     default: null
   preferred_maintenance_window:
     description:
@@ -105,27 +94,23 @@ options:
     required: false
     aliases: ['maintance_window', 'maint_window']
     default: null
-    choices: []
   cluster_parameter_group_name:
     description:
       - name of the cluster parameter group
     required: false
     aliases: ['param_group_name']
-    choices: []
     default: null
   automated_snapshot_retention_period:
     description:
       - period when the snapshot take place
     required: false
     aliases: ['retention_period']
-    choices: []
     default: null
   port:
     description:
       - which port the cluster is listining
     required: false
     default: null
-    choices: []
   cluster_version:
     description:
       - which version the cluster should have
@@ -138,38 +123,32 @@ options:
       - flag to determinate if upgrade of version is possible
     required: false
     aliases: ['version_upgrade']
-    choices: []
     default: null
   number_of_nodes:
     description:
       - number of the nodes the cluster should run
     required: false
-    choices: []
     default: null
   publicly_accessible:
     description:
       - if the cluster is accessible publicly or not
     required: false
-    choices: []
     default: null
   encrypted:
     description:
       -  if the cluster is encrypted or not
     required: false
-    choices: []
     default: null
   elastic_ip:
     description:
       - if the cluster has an elastic IP or not
     required: false
-    choices: []
     default: null
   new_cluster_identifier:
     description:
       - Only used when command=modify.
     required: false
     aliases: ['new_identifier']
-    choices: []
     default: null
   aws_secret_key:
     description:
@@ -189,15 +168,12 @@ options:
     required: false
     default: "no"
     choices: [ "yes", "no" ]
-    aliases: []
   wait_timeout:
     description:
       - how long before wait gives up, in seconds
     default: 300
-    aliases: []
-
 requirements: [ 'boto' ]
-author: Jens Carl, Hothead Games Inc.
+extends_documentation_fragment: aws
 '''
 
 EXAMPLES = '''
@@ -210,14 +186,72 @@ EXAMPLES = '''
     password=1nsecure
 '''
 
-import sys
+RETURN = '''
+cluster:
+    description: dictionary containing all the cluster information
+    returned: success
+    type: dictionary
+    contains:
+        identifier:
+            description: Id of the cluster.
+            returned: success
+            type: string
+            sample: "new_redshift_cluster"
+        create_time:
+            description: Time of the cluster creation as timestamp.
+            returned: success
+            type: float
+            sample: 1430158536.308
+        status:
+            description: Stutus of the cluster.
+            returned: success
+            type: string
+            sample: "available"
+        db_name:
+            description: Name of the database.
+            returned: success
+            type: string
+            sample: "new_db_name"
+        availability_zone:
+            description: Amazon availability zone where the cluster is located.
+            returned: success
+            type: string
+            sample: "us-east-1b"
+        maintenance_window:
+            description: Time frame when maintenance/upgrade are done.
+            returned: success
+            type: string
+            sample: "sun:09:30-sun:10:00"
+        private_ip_address:
+            description: Private IP address of the main node.
+            returned: success
+            type: string
+            sample: "10.10.10.10"
+        public_ip_address:
+            description: Public IP address of the main node.
+            returned: success
+            type: string
+            sample: "0.0.0.0"
+        port:
+            description: Port of the cluster.
+            returned: success
+            type: int
+            sample: 5439
+        url:
+            description: FQDN of the main cluster node.
+            returned: success
+            type: string
+            sample: "new-redshift_cluster.jfkdjfdkj.us-east-1.redshift.amazonaws.com"
+'''
+
 import time
 
 try:
-    import boto.redshift
+    import boto
+    import redshift from boto
+    HAS_BOTO = True
 except:
-    print "failed=True msg='boto required for this module'"
-    sys.exit(1)
+    HAS_BOTO = False
 
 
 def _collect_facts(resource):
@@ -447,6 +481,9 @@ def main():
         argument_spec = argument_spec,
     )
 
+    if not HAS_BOTO:
+        module.fail_json(msg='boto v2.9.0+ required for this module')
+
     command = module.params.get('command')
 
     region, ec2_url, aws_connect_params = get_aws_connection_info(module)
@@ -469,7 +506,7 @@ def main():
         (changed, cluster) = describe_cluster(module, conn)
 
     elif command == 'delete':
-        (changed, cluster) = delete_cluster(module, cron)
+        (changed, cluster) = delete_cluster(module, conn)
 
     elif command == 'modify':
         (changed, cluster) = modify_cluster(module, conn)
@@ -480,4 +517,5 @@ def main():
 from ansible.module_utils.basic import *
 from ansible.module_utils.ec2 import *
 
-main()
+if __name__ == '__main__':
+    main()

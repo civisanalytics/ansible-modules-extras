@@ -58,6 +58,7 @@ options:
     default: null
     aliases: [ 'ec2_access_key', 'access_key' ]
 requirements: [ 'boto' ]
+extends_documentation_fragment: aws
 '''
 
 EXAMPLES = '''
