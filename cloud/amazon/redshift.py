@@ -248,7 +248,7 @@ import time
 
 try:
     import boto
-    import redshift from boto
+    from boto import redshift
     HAS_BOTO = True
 except:
     HAS_BOTO = False
