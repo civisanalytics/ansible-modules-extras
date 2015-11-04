@@ -294,7 +294,14 @@ def create_cluster(module, redshift):
     changed = True
     # Package up the optional parameters
     params = {}
-    for p in ( 'db_name', 'cluster_type', 'cluster_security_groups', 'vpc_security_group_ids', 'cluster_subnet_group_name', 'availability_zone', 'preferred_maintenance_window', 'cluster_parameter_group_name', 'automated_snapshot_retention_period', 'port', 'cluster_version', 'allow_version_upgrade', 'number_of_nodes', 'publicly_accessible', 'encrypted', 'elastic_ip' ):
+    for p in ('db_name', 'cluster_type', 'cluster_security_groups',
+              'vpc_security_group_ids', 'cluster_subnet_group_name',
+              'availability_zone', 'preferred_maintenance_window',
+              'cluster_parameter_group_name',
+              'automated_snapshot_retention_period', 'port',
+              'cluster_version', 'allow_version_upgrade',
+              'number_of_nodes', 'publicly_accessible',
+              'encrypted', 'elastic_ip'):
         if module.params.get( p ):
             params[ p ] = module.params.get( p )
 
@@ -396,7 +403,6 @@ def modify_cluster(module, redshift):
 
     module: Ansible module object
     redshift: authenticated redshift connection object
-
     """
 
     identifier   = module.params.get('identifier')
@@ -405,7 +411,12 @@ def modify_cluster(module, redshift):
 
     # Package up the optional parameters
     params = {}
-    for p in ( 'cluster_type', 'cluster_security_groups', 'vpc_security_group_ids', 'cluster_subnet_group_name', 'availability_zone', 'preferred_maintenance_window', 'cluster_parameter_group_name', 'automated_snapshot_retention_period', 'port', 'cluster_version', 'allow_version_upgrade', 'number_of_nodes', 'new_cluster_identifier'):
+    for p in ('cluster_type', 'cluster_security_groups',
+              'vpc_security_group_ids', 'cluster_subnet_group_name',
+              'availability_zone', 'preferred_maintenance_window',
+              'cluster_parameter_group_name',
+              'automated_snapshot_retention_period', 'port', 'cluster_version',
+              'allow_version_upgrade', 'number_of_nodes', 'new_cluster_identifier'):
         if module.params.get( p ):
             params[ p ] = module.params.get( p )
 
