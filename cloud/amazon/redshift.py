@@ -264,11 +264,21 @@ def _collect_facts(resource):
         'db_name'           : resource['DBName'],
         'availability_zone' : resource['AvailabilityZone'],
         'maintenance_window': resource['PreferredMaintenanceWindow'],
+        'node_type'         : resource.get('NodeType'),
+        'public_key'        : resource.get('ClusterPublicKey'),
+        'endpoint'          : resource.get('Endpoint'),
+        'node_count'        : resource.get('NumberOfNodes'),
+        'modify_status'     : resource.get('ModifyStatus'),
+        'restore_status'    : resource.get('RestoreStatus'),
+        'vpc_id'            : resource.get('VpcId'),
+        'tags'              : resource.get('Tags'),
+        'parameter_group'   : resource.get('ParameterGroupName'),
     }
 
     for node in resource['ClusterNodes']:
         if node['NodeRole'] in ('SHARED', 'LEADER'):
             facts['private_ip_address'] = node['PrivateIPAddress']
+            facts['public_ip_address'] = node['PublicIPAddress']
             break
 
     return facts
