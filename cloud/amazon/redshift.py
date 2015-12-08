@@ -365,7 +365,7 @@ def describe_cluster(module, redshift):
         # https://github.com/boto/boto/issues/2776 is fixed.
         module.fail_json(msg = str(e))
 
-    return(True, _collect_facts(resource))
+    return(False, _collect_facts(resource))
 
 
 def delete_cluster(module, redshift):
