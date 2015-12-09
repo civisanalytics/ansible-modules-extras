@@ -21,14 +21,14 @@ author: '"Jens Carl (@j-carl), Hothead Games Inc.'"
 module: redshift
 short_description: create, delete, or modify an Amazon redshift instance
 description:
-    - Creates, deletes, or modifies amazon Redshift cluster instances.
+    - Create, delete, modify and snapshot Amazon Redshift clusters
 options:
   command:
     description:
       - Specifies the action to take.
     required: true
     default: null
-    choices: [ 'create', 'facts', 'delete', 'modify' ]
+    choices: [ 'create', 'facts', 'delete', 'modify', 'snapshot', 'restore' ]
   identifier:
     description:
       - Redshift cluster identifier.
@@ -150,6 +150,12 @@ options:
     required: false
     aliases: ['new_identifier']
     default: null
+  snapshot:
+    description:
+      - Specifies the source snapshot used when restoring a cluster from snapshot, or as the snapshot name to save to when creating a new snapshot from a running cluster
+    required: false
+    aliases: ['new_identifier']
+    default: null
   aws_secret_key:
     description:
       - AWS secret key. If not set then the value of the AWS_SECRET_KEY environment variable is used.
@@ -243,8 +249,11 @@ cluster:
             type: string
             sample: "new-redshift_cluster.jfkdjfdkj.us-east-1.redshift.amazonaws.com"
 '''
-
+from functools import partial
+from operator import itemgetter
+import json
 import time
+
 
 try:
     import boto
@@ -281,7 +290,34 @@ def _collect_facts(resource):
             facts['public_ip_address'] = node['PublicIPAddress']
             break
 
+    if facts.get('endpoint') and isinstance(facts['endpoint'], dict):
+        facts['endpoint'] = \
+            {k.lower(): facts['endpoint'][k] for k in facts['endpoint']}
+
     return facts
+
+
+def _get_error_message(json_response_error):
+    """ Given a JSONResponseError from boto, return the error message. """
+    err_msg = None
+
+    if hasattr(json_response_error, 'body') and json_response_error.body:
+        if type(json_response_error.body) in types.StringTypes:
+            err_msg = json_response_error.body
+        elif isinstance(json_response_error.body, dict):
+            err_msg = json_response_error.body.get('Error', {}).get('Message')
+
+    if not err_msg:
+        err_msg = str(json_response_error)
+    return err_msg
+
+
+def _is_not_found_error(error):
+    """
+    Return True if the given JSONResponseError means the resource can't be
+    found
+    """
+    return (error.status == 404) or (error.reason.lower() == 'not found')
 
 
 def create_cluster(module, redshift):
@@ -468,10 +504,229 @@ def modify_cluster(module, redshift):
     return(True, _collect_facts(resource))
 
 
+def snapshot_cluster(module, redshift):
+    """
+    Take a snapshot of a cluster
+
+    module: AnsibleModule object
+    redshift: authenticated redshift connection object
+
+    Returns:
+    """
+
+    identifier    = module.params.get('identifier')
+    snapshot      = module.params.get('snapshot')
+    wait          = module.params.get('wait')
+    wait_timeout  = module.params.get('wait_timeout')
+
+    changed = False
+    snapshot_present = False
+
+    if not snapshot:
+        module.fail_json(msg='Snapshot must be specified')
+
+    try:
+        snapshot_present = check_snapshot_exists(redshift, snapshot)
+    except boto.exception.JSONResponseError, e:
+        module.fail_json(msg=_get_error_message(e))
+
+    if snapshot_present:
+        return describe_cluster(module, redshift)
+
+    try:
+        redshift.create_cluster_snapshot(snapshot, identifier)
+        changed = True
+    except boto.exception.JSONResponseError, e:
+        module.fail_json(msg=_get_error_message(e))
+
+    if wait:
+        status_check = partial(check_resource_status, redshift, snapshot,
+                               resource_type='snapshot')
+
+        if not wait_for_condition(status_check, timeout=wait_timeout):
+            module.fail_json(
+                msg='Timed out waiting for snapshot creation to complete.')
+
+    (_, cluster_info) = describe_cluster(module, redshift)
+    return (changed, cluster_info)
+
+
+def restore_cluster(module, redshift):
+    """
+    Restore a new cluster from a given snapshot
+
+    module: AnsibleModule object
+    redshift: authenticated redshift connection object
+
+    Returns:
+    """
+
+    identifier    = module.params.get('identifier')
+    snapshot      = module.params.get('snapshot')
+    wait          = module.params.get('wait')
+    wait_timeout  = module.params.get('wait_timeout')
+
+    restore_params = [
+        'availability_zone',
+        'cluster_parameter_group_name',
+        'cluster_subnet_group_name',
+        'elastic_ip',
+        'port',
+        'publicly_accessible',
+        'vpc_security_group_ids', ]
+    params = {p: module.params.get(p) for p in restore_params}
+
+    if not snapshot:
+        module.fail_json(msg='Snapshot is required')
+
+    changed = False
+
+    if check_cluster_exists(redshift, identifier):
+        return describe_cluster(module, redshift)
+
+    try:
+        redshift.restore_from_cluster_snapshot(identifier, snapshot, **params)
+        changed = True
+    except boto.exception.JSONResponseError, e:
+        module.fail_json(msg=_get_error_message(e))
+
+    if wait:
+        status_check = partial(check_resource_status, redshift, identifier)
+        if not wait_for_condition(status_check, timeout=wait_timeout):
+            module.fail_json(
+                msg='Timed out waiting for cluster restore to complete.')
+
+    (_, cluster_info) = describe_cluster(module, redshift)
+    return (changed, cluster_info)
+
+
+def get_cluster(redshift, identifier):
+    """
+    Given an identifier, return the dictionary representing the identified
+    Redshift cluster, or None otherwise
+    """
+    response = redshift.describe_clusters(identifier)
+    cluster = response['DescribeClustersResponse']\
+                        ['DescribeClustersResult']\
+                        ['Clusters']
+    return cluster[0] if cluster else None
+
+
+def get_snapshot(redshift, identifier):
+    """
+    Given an identifier, return the dictionary representing the identified
+    Redshift snapshot, or None otherwise
+    """
+    response = redshift.describe_cluster_snapshots(
+        snapshot_identifier=identifier)
+    snapshot = response['DescribeClusterSnapshotsResponse']\
+                       ['DescribeClusterSnapshotsResult']\
+                       ['Snapshots']
+    return snapshot[0] if snapshot else None
+
+
+def check_cluster_exists(redshift, identifier):
+    """
+    Return True if a cluster is absent, False otherwise.
+    """
+    return check_resource_exists(redshift, identifier)
+
+
+def check_resource_exists(redshift, identifier, resource_type='cluster'):
+
+    if resource_type == 'cluster':
+        fetch = get_cluster
+    elif resource_type == 'snapshot':
+        fetch = get_snapshot
+    else:
+        raise ValueError(
+            'Unrecognized resource type: {}'.format(resource_type))
+
+    resource = None
+
+    try:
+        resource = fetch(redshift, identifier)
+    except boto.exception.JSONResponseError, e:
+        if _is_not_found_error(e):
+            return False
+
+    return bool(resource)
+
+
+def check_resource_status(redshift, identifier, resource_type='cluster',
+                          desired_status='available'):
+    """
+    Return True if the cluster has the given desired status, False otherwise
+    """
+    has_status = False
+
+    resource = None
+    status_field = None
+
+    if resource_type == 'cluster':
+        fetch = get_cluster
+        status_field = 'ClusterStatus'
+    elif resource_type == 'snapshot':
+        fetch = get_snapshot
+        status_field = 'Status'
+    else:
+        raise ValueError(
+            'Unrecognized resource type: {}'.format(resource_type))
+
+    try:
+        resource = fetch(redshift, identifier)
+    except boto.exception.JSONResponseError, e:
+        if _is_not_found_error(e):
+            pass
+
+    if not resource:
+        pass
+
+    if resource and (resource.get(status_field) == desired_status):
+        has_status = True
+
+    return has_status
+
+
+def check_snapshot_exists(redshift, snapshot_identifier):
+    """
+    Return True if the given snapshot exists, False otherwise
+    """
+    return check_resource_exists(redshift, snapshot_identifier,
+                                 resource_type='snapshot')
+
+
+def wait_for_condition(condition_check, timeout=300):
+    """
+    Given a callable representing a check for some condition, wait until the
+    condition is met.
+
+    The callable is expected to return True when the condition is met,
+    False otherwise.
+
+    Timeout is the number of seconds to wait.
+    If timeout is set to 0, then we will wait forever until the condition is
+    met.
+    """
+    wait_timeout = time.time() + timeout
+
+    if timeout == 0:
+        time_check = lambda: True
+    else:
+        time_check = lambda: wait_timeout > time.time()
+
+    while time_check():
+        if condition_check():
+            return True
+        time.sleep(5)
+
+    return False
+
+
 def main():
     argument_spec = ec2_argument_spec()
     argument_spec.update(dict(
-            command                             = dict(choices=['create', 'facts', 'delete', 'modify'], required=True),
+            command                             = dict(choices=['create', 'facts', 'delete', 'modify', 'snapshot', 'restore'], required=True),
             identifier                          = dict(required=True),
             node_type                           = dict(choices=['dw1.xlarge', 'dw1.8xlarge', 'dw2.large', 'dw2.8xlarge',
                                                                 'dc1.large', 'dc1.8xlarge', 'ds2.xlarge', 'ds2.8xlarge',
@@ -495,6 +750,7 @@ def main():
             encrypted                           = dict(type='bool'),
             elastic_ip                          = dict(required=False),
             new_cluster_identifier              = dict(aliases=['new_identifier']),
+            snapshot                            = dict(required=False),
             wait                                = dict(type='bool', default=False),
             wait_timeout                        = dict(default=300),
         )
@@ -533,6 +789,12 @@ def main():
 
     elif command == 'modify':
         (changed, cluster) = modify_cluster(module, conn)
+
+    elif command == 'snapshot':
+        (changed, cluster) = snapshot_cluster(module, conn)
+
+    elif command == 'restore':
+        (changed, cluster) = restore_cluster(module, conn)
 
     module.exit_json(changed=changed, cluster=cluster)
 
