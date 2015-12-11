@@ -250,14 +250,12 @@ cluster:
             sample: "new-redshift_cluster.jfkdjfdkj.us-east-1.redshift.amazonaws.com"
 '''
 from functools import partial
-from operator import itemgetter
-import json
 import time
 
 
 try:
-    import boto
-    from boto import redshift
+    import boto.exception
+    import boto.redshift
     HAS_BOTO = True
 except:
     HAS_BOTO = False
@@ -297,21 +295,6 @@ def _collect_facts(resource):
     return facts
 
 
-def _get_error_message(json_response_error):
-    """ Given a JSONResponseError from boto, return the error message. """
-    err_msg = None
-
-    if hasattr(json_response_error, 'body') and json_response_error.body:
-        if type(json_response_error.body) in types.StringTypes:
-            err_msg = json_response_error.body
-        elif isinstance(json_response_error.body, dict):
-            err_msg = json_response_error.body.get('Error', {}).get('Message')
-
-    if not err_msg:
-        err_msg = str(json_response_error)
-    return err_msg
-
-
 def _is_not_found_error(error):
     """
     Return True if the given JSONResponseError means the resource can't be
@@ -337,56 +320,43 @@ def create_cluster(module, redshift):
     wait         = module.params.get('wait')
     wait_timeout = module.params.get('wait_timeout')
 
-    changed = True
-    # Package up the optional parameters
-    params = {}
-    for p in ('db_name', 'cluster_type', 'cluster_security_groups',
-              'vpc_security_group_ids', 'cluster_subnet_group_name',
-              'availability_zone', 'preferred_maintenance_window',
-              'cluster_parameter_group_name',
-              'automated_snapshot_retention_period', 'port',
-              'cluster_version', 'allow_version_upgrade',
-              'number_of_nodes', 'publicly_accessible',
-              'encrypted', 'elastic_ip'):
-        if module.params.get( p ):
-            params[ p ] = module.params.get( p )
+    create_params = ('db_name',
+                     'cluster_type',
+                     'cluster_security_groups',
+                     'vpc_security_group_ids',
+                     'cluster_subnet_group_name',
+                     'availability_zone',
+                     'preferred_maintenance_window',
+                     'cluster_parameter_group_name',
+                     'automated_snapshot_retention_period',
+                     'port',
+                     'cluster_version',
+                     'allow_version_upgrade',
+                     'number_of_nodes',
+                     'publicly_accessible',
+                     'encrypted',
+                     'elastic_ip')
+
+    params = {p: module.params[p] for p in create_params
+              if module.params.get(p)}
+
+    if check_cluster_exists(identifier):
+        return describe_clusters(module, redshift)
 
     try:
-        redshift.describe_clusters(identifier)['DescribeClustersResponse']['DescribeClustersResult']['Clusters'][0]
-        changed = False
+        redshift.create_cluster(
+            identifier, node_type, username, password, **params)
     except boto.exception.JSONResponseError, e:
-        try:
-            redshift.create_cluster(identifier, node_type, username, password, **params)
-        except boto.exception.JSONResponseError, e:
-            # FIXME: Change this to just set the error message when
-            # https://github.com/boto/boto/issues/2776 is fixed.
-            module.fail_json(msg = str(e))
-
-    try:
-        resource = redshift.describe_clusters(identifier)['DescribeClustersResponse']['DescribeClustersResult']['Clusters'][0]
-    except boto.exception.JSONResponseError, e:
-        # FIXME: Change this to just set the error message when
-        # https://github.com/boto/boto/issues/2776 is fixed.
-        module.fail_json(msg = str(e))
+        module.fail_json(msg=json_response_err_msg(e))
 
     if wait:
-        try:
-            wait_timeout = time.time() + wait_timeout
-            time.sleep(5)
+        check_exists = partial(check_cluster_exists, redshift, identifier)
+        if not wait_for_condition(check_exists, timeout=wait_timeout):
+            module.fail_json(
+                msg='Timed out while creating cluster "{}"'.format(identifier))
 
-            while wait_timeout > time.time() and resource['ClusterStatus'] != 'available':
-                time.sleep(5)
-                if wait_timeout <= time.time():
-                    module.fail_json(msg = "Timeout waiting for resource %s" % resource.id)
-
-                resource = redshift.describe_clusters(identifier)['DescribeClustersResponse']['DescribeClustersResult']['Clusters'][0]
-
-        except boto.exception.JSONResponseError, e:
-            # FIXME: Change this to just set the error message when
-            # https://github.com/boto/boto/issues/2776 is fixed.
-            module.fail_json(msg = str(e))
-
-    return(changed, _collect_facts(resource))
+    (_, cluster) = describe_cluster(module, redshift)
+    return (True, cluster)
 
 
 def describe_cluster(module, redshift):
@@ -416,29 +386,25 @@ def delete_cluster(module, redshift):
     wait         = module.params.get('wait')
     wait_timeout = module.params.get('wait_timeout')
 
+    if check_cluster_absent(redshift, identifier):
+        return (False, {})
+
+    if snapshot:
+        args = {'final_cluster_snapshot_identifier': snapshot,
+                'skip_final_cluster_snapshot': False}
+    else:
+        args = {'skip_final_cluster_snapshot': True}
+
     try:
-        redshift.delete_custer( identifier )
+        redshift.delete_cluster(identifier, **args)
     except boto.exception.JSONResponseError, e:
-        # FIXME: Change this to just set the error message when
-        # https://github.com/boto/boto/issues/2776 is fixed.
-        module.fail_json(msg = str(e))
+        module.fail_json(msg=json_response_err_msg(e))
 
     if wait:
-        try:
-            wait_timeout = time.time() + wait_timeout
-            resource = redshift.describe_clusters(identifier)['DescribeClustersResponse']['DescribeClustersResult']['Clusters'][0]
-
-            while wait_timeout > time.time() and resource['ClusterStatus'] != 'deleting':
-                time.sleep(5)
-                if wait_timeout <= time.time():
-                    module.fail_json(msg = "Timeout waiting for resource %s" % resource.id)
-
-                resource = redshift.describe_clusters(identifier)['DescribeClustersResponse']['DescribeClustersResult']['Clusters'][0]
-
-        except boto.exception.JSONResponseError, e:
-            # FIXME: Change this to just set the error message when
-            # https://github.com/boto/boto/issues/2776 is fixed.
-            module.fail_json(msg = str(e))
+        is_absent = partial(check_cluster_absent, redshift, identifier)
+        if not wait_for_condition(is_absent, timeout=wait_timeout):
+            module.fail_json(
+                msg='Timed out while deleting cluster {}'.format(identifier))
 
     return(True, {})
 
@@ -455,51 +421,32 @@ def modify_cluster(module, redshift):
     wait         = module.params.get('wait')
     wait_timeout = module.params.get('wait_timeout')
 
-    # Package up the optional parameters
-    params = {}
-    for p in ('cluster_type', 'cluster_security_groups',
-              'vpc_security_group_ids', 'cluster_subnet_group_name',
-              'availability_zone', 'preferred_maintenance_window',
-              'cluster_parameter_group_name',
-              'automated_snapshot_retention_period', 'port', 'cluster_version',
-              'allow_version_upgrade', 'number_of_nodes', 'new_cluster_identifier'):
-        if module.params.get( p ):
-            params[ p ] = module.params.get( p )
+    modify_params = ('cluster_type',
+                     'cluster_security_groups',
+                     'vpc_security_group_ids',
+                     'cluster_subnet_group_name',
+                     'availability_zone',
+                     'preferred_maintenance_window',
+                     'cluster_parameter_group_name',
+                     'automated_snapshot_retention_period',
+                     'port',
+                     'cluster_version',
+                     'allow_version_upgrade',
+                     'number_of_nodes',
+                     'new_cluster_identifier')
 
+    params = {p: module.params[p] for p in modify_params
+              if module.params.get(p)}
     try:
-        redshift.describe_clusters(identifier)['DescribeClustersResponse']['DescribeClustersResult']['Clusters'][0]
-        changed = False
+        redshift.modify_cluster(identifier, **params)
     except boto.exception.JSONResponseError, e:
-        try:
-            redshift.modify_cluster(identifier, **params)
-        except boto.exception.JSONResponseError, e:
-            # FIXME: Change this to just set the error message when
-            # https://github.com/boto/boto/issues/2776 is fixed.
-            module.fail_json(msg = str(e))
-
-    try:
-        resource = redshift.describe_clusters(identifier)['DescribeClustersResponse']['DescribeClustersResult']['Clusters'][0]
-    except boto.exception.JSONResponseError, e:
-        # FIXME: Change this to just set the error message when
-        # https://github.com/boto/boto/issues/2776 is fixed.
-        module.fail_json(msg = str(e))
+        module.fail_json(msg=json_response_err_msg(e))
 
     if wait:
-        try:
-            wait_timeout = time.time() + wait_timeout
-            time.sleep(5)
-
-            while wait_timeout > time.time() and resource['ClusterStatus'] != 'available':
-                time.sleep(5)
-                if wait_timeout <= time.time():
-                    module.fail_json(msg = "Timeout waiting for resource %s" % resource.id)
-
-                resource = redshift.describe_clusters(identifier)['DescribeClustersResponse']['DescribeClustersResult']['Clusters'][0]
-
-        except boto.exception.JSONResponseError, e:
-            # FIXME: Change this to just set the error message when
-            # https://github.com/boto/boto/issues/2776 is fixed.
-            module.fail_json(msg = str(e))
+        check_status = partial(check_resource_status, redshift, identifier)
+        if not wait_for_condition(check_status, timeout=wait_timeout):
+            module.fail_json(
+                msg='Timed out waiting for cluster modification to complete.')
 
     return(True, _collect_facts(resource))
 
@@ -632,6 +579,10 @@ def check_cluster_exists(redshift, identifier):
     return check_resource_exists(redshift, identifier)
 
 
+def check_cluster_absent(redshift, identifier):
+    return not check_cluster_exists(redshift, identifier)
+
+
 def check_resource_exists(redshift, identifier, resource_type='cluster'):
 
     if resource_type == 'cluster':
@@ -699,21 +650,25 @@ def check_snapshot_exists(redshift, snapshot_identifier):
 def wait_for_condition(condition_check, timeout=300):
     """
     Given a callable representing a check for some condition, wait until the
-    condition is met.
+    condition is met, within some maxiumum amount of time (timeout).
 
-    The callable is expected to return True when the condition is met,
-    False otherwise.
+    The given condition_check callable is expected to return True when the
+    condition is met, False otherwise.
 
-    Timeout is the number of seconds to wait.
-    If timeout is set to 0, then we will wait forever until the condition is
-    met.
+    Timeout is the maxiumum number of seconds to wait.
+
+    If timeout is set to 0, then we will wait forever.
+
+    Returns:
+    - True: condition was met within the timeout period
+    - False: reached timeout and the condition was still not met
     """
     wait_timeout = time.time() + timeout
 
     if timeout == 0:
-        time_check = lambda: True
+        def time_check(): return True
     else:
-        time_check = lambda: wait_timeout > time.time()
+        def time_check(): return wait_timeout > time.time()
 
     while time_check():
         if condition_check():
@@ -721,6 +676,21 @@ def wait_for_condition(condition_check, timeout=300):
         time.sleep(5)
 
     return False
+
+
+def json_response_err_msg(json_response_error):
+    """ Given a JSONResponseError from boto, return the error message. """
+    err_msg = None
+
+    if hasattr(json_response_error, 'body') and json_response_error.body:
+        if type(json_response_error.body) in types.StringTypes:
+            err_msg = json_response_error.body
+        elif isinstance(json_response_error.body, dict):
+            err_msg = json_response_error.body.get('Error', {}).get('Message')
+
+    if not err_msg:
+        err_msg = str(json_response_error)
+    return err_msg
 
 
 def main():
