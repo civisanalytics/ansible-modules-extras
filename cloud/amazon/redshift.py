@@ -15,9 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+
 DOCUMENTATION = '''
 ---
-author: '"Jens Carl (@j-carl), Hothead Games Inc.'"
+author:
+- '"Jens Carl (@j-carl), Hothead Games Inc.'"
+- "Herby Gillot (herby.gillot@gmail.com)"
 module: redshift
 short_description: create, delete, or modify an Amazon redshift instance
 description:
@@ -152,9 +155,10 @@ options:
     default: null
   snapshot:
     description:
-      - Specifies the source snapshot used when restoring a cluster from snapshot, or as the snapshot name to save to when creating a new snapshot from a running cluster
+      - Specifies the source snapshot used when restoring a new cluster from a snapshot (command=restore), or as the snapshot name to save to when creating a new snapshot from a running cluster (command=snapshot)
+      - When deleting a cluster, if this is set, a final snapshot will be created and named as per this parameter before the cluster is destroyed
     required: false
-    aliases: ['new_identifier']
+    aliases: ['final_snapshot']
     default: null
   aws_secret_key:
     description:
@@ -176,11 +180,13 @@ options:
     choices: [ "yes", "no" ]
   wait_timeout:
     description:
-      - how long before wait gives up, in seconds
+      - How long before wait gives up, in seconds
+      - If set to 0, will wait forever
     default: 300
 requirements: [ 'boto' ]
 extends_documentation_fragment: aws
-'''
+'''  # noqa
+
 
 EXAMPLES = '''
 # Basic cluster provisioning example
@@ -190,7 +196,34 @@ EXAMPLES = '''
     identifier=new_cluster
     username=cluster_admin
     password=1nsecure
-'''
+
+# Delete cluster "foobar"
+- redshift:
+    identifier: 'foobar'
+    region:     'us-east-1'
+    command:    'delete'
+
+# Create a snapshot from Redshift cluster "cluster1"
+# Wait as long as it takes for the snapshotting process to complete
+- redshift:
+    identifier:   'cluster1'
+    region:       'us-east-1'
+    snapshot:     'cluster1-snapshot-1'
+    command:      'snapshot'
+    wait:          yes
+    wait_timeout:  0
+
+# Restore a new cluster from the snapshot we just created, and wait up to an
+# hour for the operation to complete
+- redshift:
+    identifier:   'cluster2'
+    region:       'us-east-1'
+    snapshot:     'cluster1-snapshot-1'
+    command:      'restore'
+    wait:          yes
+    wait_timeout:  3600
+'''  # noqa
+
 
 RETURN = '''
 cluster:
@@ -218,6 +251,11 @@ cluster:
             returned: success
             type: string
             sample: "new_db_name"
+        node_type:
+            description: the cluster's type
+            returned: success
+            type: string
+            sample: "ds2.xlarge"
         availability_zone:
             description: Amazon availability zone where the cluster is located.
             returned: success
@@ -238,17 +276,54 @@ cluster:
             returned: success
             type: string
             sample: "0.0.0.0"
-        port:
-            description: Port of the cluster.
+        public_key:
+            description: the SSH public key of the cluster
+            returned: success
+            type: string
+            sample: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCbd+acx3...."
+        node_count:
+            description: the number of nodes in this cluster
             returned: success
             type: int
-            sample: 5439
-        url:
-            description: FQDN of the main cluster node.
+            sample: 12
+        parameter_groups:
+            description: list of parameter groups enabled for this cluster
+            returned: success
+            type: list
+            sample: [{'ClusterParameterStatusList': None, 'ParameterApplyStatus': 'in-sync', 'ParameterGroupName': 'my-parameter-group'}]
+        security_groups:
+            description list of security groups enabled for this cluster
+            returned: success
+            type: list
+            sample: [{'ClusterSecurityGroupName': 'prod', 'Status': 'active'}]
+        vpc_id:
+            description: the ID of the VPC the cluster is in
+            returned: success
+            type: string
+            sample: "vpc-12345678"
+        tags:
+            description: list of key/value dicts for each tag pair set in the cluster
+            returned: success
+            type: list
+            sample: [{"Key": "environment", "Value": "production"}]
+        address:
+            description: address of cluster endpoint
             returned: success
             type: string
             sample: "new-redshift_cluster.jfkdjfdkj.us-east-1.redshift.amazonaws.com"
-'''
+        port:
+            description: service port of cluster
+            returned: success
+            type: int
+            sample: 5439
+        kms_key_id:
+            description: KMS Key ID used to encrypt the database
+            returned: success
+            type: string
+            sample: "arn:aws:kms:us-east-1:123456789012:key/fdsfa89f-32ff-3333-fdsd-3r2f3ifdsoif"
+'''  # noqa
+
+
 from functools import partial
 import time
 
