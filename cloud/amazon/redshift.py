@@ -266,34 +266,34 @@ except:
 def _collect_facts(resource):
     """Transfrom cluster information to dict."""
     facts = {
-        'identifier'        : resource['ClusterIdentifier'],
-        'create_time'       : resource['ClusterCreateTime'],
-        'status'            : resource['ClusterStatus'],
-        'username'          : resource['MasterUsername'],
-        'db_name'           : resource['DBName'],
-        'availability_zone' : resource['AvailabilityZone'],
-        'maintenance_window': resource['PreferredMaintenanceWindow'],
-        'node_type'         : resource.get('NodeType'),
-        'public_key'        : resource.get('ClusterPublicKey'),
-        'endpoint'          : resource.get('Endpoint'),
-        'node_count'        : resource.get('NumberOfNodes'),
-        'modify_status'     : resource.get('ModifyStatus'),
-        'restore_status'    : resource.get('RestoreStatus'),
-        'vpc_id'            : resource.get('VpcId'),
-        'tags'              : resource.get('Tags'),
-        'parameter_group'   : resource.get('ParameterGroupName'),
+        'identifier':         resource.get('ClusterIdentifier'),
+        'create_time':        resource.get('ClusterCreateTime'),
+        'status':             resource.get('ClusterStatus'),
+        'username':           resource.get('MasterUsername'),
+        'db_name':            resource.get('DBName'),
+        'availability_zone':  resource.get('AvailabilityZone'),
+        'maintenance_window': resource.get('PreferredMaintenanceWindow'),
+        'node_type':          resource.get('NodeType'),
+        'public_key':         resource.get('ClusterPublicKey'),
+        'node_count':         resource.get('NumberOfNodes'),
+        'modify_status':      resource.get('ModifyStatus'),
+        'restore_status':     resource.get('RestoreStatus'),
+        'vpc_id':             resource.get('VpcId'),
+        'tags':               resource.get('Tags'),
+        'kms_key_id':         resource.get('KmsKeyId'),
+        'parameter_groups':   resource.get('ClusterParameterGroups'),
+        'security_groups':    resource.get('ClusterSecurityGroups'),
     }
 
     for node in resource['ClusterNodes']:
         if node['NodeRole'] in ('SHARED', 'LEADER'):
-            facts['private_ip_address'] = node['PrivateIPAddress']
-            facts['public_ip_address'] = node['PublicIPAddress']
+            facts['private_ip_address'] = node.get('PrivateIPAddress')
+            facts['public_ip_address'] = node.get('PublicIPAddress')
             break
 
-    if facts.get('endpoint') and isinstance(facts['endpoint'], dict):
-        facts['endpoint'] = \
-            {k.lower(): facts['endpoint'][k] for k in facts['endpoint']}
-
+    if resource.get('endpoint') and isinstance(resource['endpoint'], dict):
+        for c in ('Address', 'Port'):
+            facts[c.lower()] = resource.get('endpoint', {}).get(c)
     return facts
 
 
