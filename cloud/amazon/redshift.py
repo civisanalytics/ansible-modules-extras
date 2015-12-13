@@ -412,8 +412,12 @@ def create_cluster(module, redshift):
                      'encrypted',
                      'elastic_ip')
 
-    params = {p: module.params[p] for p in create_params
-              if module.params.get(p)}
+    params = {}
+
+    for p in create_params:
+        prm = module.params.get(p)
+        if prm:
+            params[p] = prm
 
     if check_cluster_exists(identifier):
         return describe_clusters(module, redshift)
@@ -514,8 +518,12 @@ def modify_cluster(module, redshift):
                      'number_of_nodes',
                      'new_cluster_identifier')
 
-    params = {p: module.params[p] for p in modify_params
-              if module.params.get(p)}
+    params = {}
+    for p in modify_params:
+        prm = module.params.get(p)
+        if prm:
+            params[p] = prm
+
     try:
         redshift.modify_cluster(identifier, **params)
     except boto.exception.JSONResponseError, e:
@@ -596,7 +604,11 @@ def restore_cluster(module, redshift):
                       'publicly_accessible',
                       'vpc_security_group_ids')
 
-    params = {p: module.params.get(p) for p in restore_params}
+    params = {}
+    for p in restore_params:
+        prm = module.params.get(p)
+        if prm:
+            params[p] = prm
 
     if not snapshot:
         module.fail_json(msg='Snapshot is required')

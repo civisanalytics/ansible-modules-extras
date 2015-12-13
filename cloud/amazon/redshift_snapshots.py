@@ -565,8 +565,11 @@ class RedshiftSnapshotsModule(object):
 
         snapshots = list()
 
-        params = \
-            {k: self.params[k] for k in list_params if self.params.get(k)}
+        params = {}
+        for p in list_params:
+            prm = self.params.get(p)
+            if prm:
+                params[p] = prm
 
         if self.params.get('cluster'):
             params['cluster_identifier'] = self.params['cluster']
