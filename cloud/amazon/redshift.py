@@ -328,6 +328,9 @@ from functools import partial
 import time
 
 
+CHECK_MODE = False
+
+
 try:
     import boto.exception
     import boto.redshift
@@ -422,6 +425,9 @@ def create_cluster(module, redshift):
     if check_cluster_exists(identifier):
         return describe_clusters(module, redshift)
 
+    if CHECK_MODE:
+        return (True, {})
+
     try:
         redshift.create_cluster(
             identifier, node_type, username, password, **params)
@@ -472,6 +478,9 @@ def delete_cluster(module, redshift):
     if check_cluster_absent(redshift, identifier):
         return (False, {})
 
+    if CHECK_MODE:
+        return (True, {})
+
     if snapshot:
         args = {'final_cluster_snapshot_identifier': snapshot,
                 'skip_final_cluster_snapshot': False}
@@ -517,6 +526,9 @@ def modify_cluster(module, redshift):
                      'allow_version_upgrade',
                      'number_of_nodes',
                      'new_cluster_identifier')
+
+    if CHECK_MODE:
+        return (True, describe_cluster(module, redshift)[1])
 
     params = {}
     for p in modify_params:
@@ -564,6 +576,9 @@ def snapshot_cluster(module, redshift):
 
     if snapshot_present:
         return describe_cluster(module, redshift)
+
+    if CHECK_MODE:
+        return (True, describe_cluster(module, redshift)[1])
 
     try:
         redshift.create_cluster_snapshot(snapshot, identifier)
@@ -615,6 +630,9 @@ def restore_cluster(module, redshift):
 
     if check_cluster_exists(redshift, identifier):
         return describe_cluster(module, redshift)
+
+    if CHECK_MODE:
+        return (True, describe_cluster(module, redshift)[1])
 
     try:
         redshift.restore_from_cluster_snapshot(identifier, snapshot, **params)
@@ -777,6 +795,8 @@ def json_response_err_msg(json_response_error):
 
 
 def main():
+    global CHECK_MODE
+
     argument_spec = ec2_argument_spec()
     argument_spec.update({
 
@@ -859,10 +879,13 @@ def main():
         }
     )
 
-    module = AnsibleModule(argument_spec=argument_spec)
+    module = AnsibleModule(argument_spec=argument_spec,
+                           supports_check_mode=True)
 
     if not HAS_BOTO:
         module.fail_json(msg='boto v2.9.0+ required for this module')
+
+    CHECK_MODE = module.check_mode
 
     command = module.params.get('command')
 
