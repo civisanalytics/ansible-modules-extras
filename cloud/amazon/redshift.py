@@ -871,7 +871,7 @@ def main():
 
         'wait':                         dict(type='bool', default=False),
 
-        'wait_timeout':                 dict(default=300),
+        'wait_timeout':                 dict(type='int', default=300),
 
         'automated_snapshot_retention_period':
             dict(aliases=['retention_period']),
