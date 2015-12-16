@@ -359,6 +359,7 @@ def _collect_facts(resource):
         'kms_key_id':         resource.get('KmsKeyId'),
         'parameter_groups':   resource.get('ClusterParameterGroups'),
         'security_groups':    resource.get('ClusterSecurityGroups'),
+        'endpoint':           resource.get('Endpoint'),
     }
 
     for node in resource['ClusterNodes']:
@@ -367,9 +368,9 @@ def _collect_facts(resource):
             facts['public_ip_address'] = node.get('PublicIPAddress')
             break
 
-    if resource.get('endpoint') and isinstance(resource['endpoint'], dict):
+    if resource.get('Endpoint') and isinstance(resource['Endpoint'], dict):
         for c in ('Address', 'Port'):
-            facts[c.lower()] = resource.get('endpoint', {}).get(c)
+            facts[c.lower()] = resource.get('Endpoint', {}).get(c)
     return facts
 
 
