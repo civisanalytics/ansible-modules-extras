@@ -611,11 +611,15 @@ def restore_cluster(module, redshift):
     wait = module.params.get('wait')
     wait_timeout = module.params.get('wait_timeout')
 
-    restore_params = ('availability_zone',
+    restore_params = ('allow_version_upgrade',
+                      'automated_snapshot_retention_period',
+                      'availability_zone',
                       'cluster_parameter_group_name',
+                      'cluster_security_groups',
                       'cluster_subnet_group_name',
                       'elastic_ip',
                       'port',
+                      'preferred_maintenance_window',
                       'publicly_accessible',
                       'vpc_security_group_ids')
 
