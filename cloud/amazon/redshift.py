@@ -394,6 +394,10 @@ def create_cluster(module, redshift):
     wait = module.params.get('wait')
     wait_timeout = module.params.get('wait_timeout')
 
+    if not node_type:
+        module.fail_json(
+            msg='node_type must be specified when creating a cluster.')
+
     create_params = ('db_name',
                      'cluster_type',
                      'cluster_security_groups',
