@@ -513,10 +513,10 @@ def modify_cluster(module, redshift):
                      'preferred_maintenance_window',
                      'cluster_parameter_group_name',
                      'automated_snapshot_retention_period',
-                     'port',
                      'cluster_version',
                      'allow_version_upgrade',
                      'number_of_nodes',
+                     'node_type',
                      'new_cluster_identifier')
 
     if CHECK_MODE:
@@ -527,6 +527,9 @@ def modify_cluster(module, redshift):
         prm = module.params.get(p)
         if prm:
             params[p] = prm
+
+    if module.params.get('password'):
+        params['master_user_password'] = module.params.get('password')
 
     try:
         redshift.modify_cluster(identifier, **params)
