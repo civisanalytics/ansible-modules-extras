@@ -30,29 +30,24 @@ options:
     description:
       - Specifies the action to take.
     required: true
-    default: null
     choices: [ 'create', 'facts', 'delete', 'modify', 'snapshot', 'restore' ]
   identifier:
     description:
       - Redshift cluster identifier.
     required: true
-    default: null
   node_type:
     description:
       - The node type of the cluster. Must be specified when command=create.
-    required: true
-    default: null
+    required: false
     choices: ['dw1.xlarge', 'dw1.8xlarge', 'dw2.large', 'dw2.8xlarge', 'dc1.large', 'dc1.8xlarge', 'ds2.xlarge', 'ds2.8xlarge', 'ds1.large', 'ds1.8xlarge']
   username:
     description:
       - Master database username. Used only when command=create.
-    required: true
-    default: null
+    required: false
   password:
     description:
       - Master database password. Used only when command=create.
     required: true
-    default: null
   cluster_type:
     description:
       - The type of cluster.
@@ -174,7 +169,7 @@ options:
     aliases: [ 'ec2_access_key', 'access_key' ]
   wait:
     description:
-      - When command=create, modify or restore then wait for the database to enter the 'available' state. When command=delete wait for the database to be terminated.
+      - When creating, modifying or restoring a cluster, we will wait for the database to enter the 'available' state. When deleting, wait for the database to be terminated.
     required: false
     default: "no"
     choices: [ "yes", "no" ]
@@ -803,85 +798,64 @@ def main():
     global CHECK_MODE
 
     argument_spec = ec2_argument_spec()
-    argument_spec.update({
+    argument_spec.update(dict(
 
-        'command':                      dict(choices=['create',
-                                                      'facts',
-                                                      'delete',
-                                                      'modify',
-                                                      'snapshot',
-                                                      'restore'],
-                                             required=True),
+        command=dict(choices=['create', 'facts', 'delete', 'modify',
+                                'snapshot', 'restore'], required=True),
 
-        'identifier':                   dict(required=True),
+        identifier=dict(required=True),
 
         # NOTE: dw1.* and dw2.* cluster types have been deprecated
-        'node_type':                    dict(choices=['dw1.xlarge',
-                                                      'dw1.8xlarge',
-                                                      'dw2.large',
-                                                      'dw2.8xlarge',
-                                                      'dc1.large',
-                                                      'dc1.8xlarge',
-                                                      'ds2.xlarge',
-                                                      'ds2.8xlarge',
-                                                      'ds1.large',
-                                                      'ds1.8xlarge'],
-                                             required=False),
+        node_type=dict(choices=['dw1.xlarge', 'dw1.8xlarge', 'dw2.large',
+                                  'dw2.8xlarge', 'dc1.large', 'dc1.8xlarge',
+                                  'ds2.xlarge', 'ds2.8xlarge', 'ds1.large',
+                                  'ds1.8xlarge'], required=False),
 
-        'username':                     dict(required=False),
+        username=dict(required=False),
 
-        'password':                     dict(no_log=True, required=False),
+        password=dict(no_log=True, required=False),
 
-        'db_name':                      dict(required=False),
+        db_name=dict(required=False),
 
-        'cluster_type':                 dict(choices=['multi-node',
-                                                      'single-node'],
-                                             default='single-node'),
+        cluster_type=dict(choices=['multi-node', 'single-node'], default='single-node'),  # noqa
 
-        'cluster_security_groups':      dict(aliases=['security_groups'],
-                                             type='list'),
+        cluster_security_groups=dict(aliases=['security_groups'], type='list'),  # noqa
 
-        'vpc_security_group_ids':       dict(aliases=['vpc_security_groups'],
-                                             type='list'),
+        vpc_security_group_ids=dict(aliases=['vpc_security_groups'], type='list'),  # noqa
 
-        'cluster_subnet_group_name':    dict(aliases=['subnet']),
+        cluster_subnet_group_name=dict(aliases=['subnet']),
 
-        'availability_zone':            dict(aliases=['aws_zone', 'zone']),
+        availability_zone=dict(aliases=['aws_zone', 'zone']),
 
-        'preferred_maintenance_window': dict(aliases=['maintance_window',
-                                                      'maint_window']),
+        preferred_maintenance_window=dict(aliases=['maintance_window', 'maint_window']),  # noqa
 
-        'cluster_parameter_group_name': dict(aliases=['param_group_name']),
+        cluster_parameter_group_name=dict(aliases=['param_group_name']),
 
-        'port':                         dict(type='int'),
+        port=dict(type='int'),
 
-        'cluster_version':              dict(aliases=['version'],
-                                             choices=['1.0']),
+        cluster_version=dict(aliases=['version'], choices=['1.0']),
 
-        'allow_version_upgrade':        dict(aliases=['version_upgrade'],
-                                             type='bool'),
+        allow_version_upgrade=dict(aliases=['version_upgrade'], type='bool'),
 
-        'number_of_nodes':              dict(type='int'),
+        number_of_nodes=dict(type='int'),
 
-        'publicly_accessible':          dict(type='bool'),
+        publicly_accessible=dict(type='bool'),
 
-        'encrypted':                    dict(type='bool'),
+        encrypted=dict(type='bool'),
 
-        'elastic_ip':                   dict(required=False),
+        elastic_ip=dict(required=False),
 
-        'new_cluster_identifier':       dict(aliases=['new_identifier']),
+        new_cluster_identifier=dict(aliases=['new_identifier']),
 
-        'snapshot':                     dict(aliases=['final_snapshot'],
-                                             required=False),
+        snapshot=dict(aliases=['final_snapshot'], required=False),
 
-        'wait':                         dict(type='bool', default=False),
+        wait=dict(type='bool', default=False),
 
-        'wait_timeout':                 dict(type='int', default=300),
+        wait_timeout=dict(type='int', default=300),
 
-        'automated_snapshot_retention_period':
-            dict(aliases=['retention_period']),
+        automated_snapshot_retention_period=dict(aliases=['retention_period']),
 
-        }
+        )
     )
 
     module = AnsibleModule(argument_spec=argument_spec,

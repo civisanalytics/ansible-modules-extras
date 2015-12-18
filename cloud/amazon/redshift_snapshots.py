@@ -782,63 +782,42 @@ def wait_for_condition(condition_check, timeout, interval=3):
 def main():
     argument_spec = ec2_argument_spec()
 
-    argument_spec.update({
-            'command':                    dict(choices=['list',
-                                                        'facts',
-                                                        'copy',
-                                                        'delete'],
-                                               default='list',
-                                               required=False),
+    argument_spec.update(dict(
+            command=dict(choices=['list', 'facts', 'copy', 'delete'],
+                         default='list', required=False),
 
-            'cluster':                    dict(required=False,
-                                               aliases=['identifier',
-                                                        'instance']),
+            cluster=dict(required=False, aliases=['identifier', 'instance']),
 
-            'cluster_pattern':            dict(required=False),
+            cluster_pattern=dict(required=False),
 
-            'name':                       dict(required=False,
-                                               aliases=['snapshot',
-                                                        'source']),
+            name=dict(required=False, aliases=['snapshot', 'source']),
 
-            'name_pattern':               dict(required=False),
+            name_pattern=dict(required=False),
 
-            'dest':                       dict(required=False,
-                                               aliases=['new_snapshot']),
+            dest=dict(required=False, aliases=['new_snapshot']),
 
-            'force':                      dict(required=False,
-                                               type='bool',
-                                               default=False),
+            force=dict(required=False, type='bool', default=False),
 
-            'snapshot_type':              dict(required=False),
+            snapshot_type=dict(required=False),
 
-            'start_time':                 dict(required=False),
+            start_time=dict(required=False),
 
-            'end_time':                   dict(required=False),
+            end_time=dict(required=False),
 
-            'greater_than_mb':            dict(required=False,
-                                               type='float'),
+            greater_than_mb=dict(required=False, type='float'),
 
-            'less_than_mb':               dict(required=False,
-                                               type='float'),
+            less_than_mb=dict(required=False, type='float'),
 
-            'sort_by':                    dict(required=False,
-                                               default='create_time_epoch'),
+            sort_by=dict(required=False, default='create_time_epoch'),
 
-            'reverse_sort':               dict(required=False,
-                                               type='bool',
-                                               default=False),
+            reverse_sort=dict(required=False, type='bool', default=False),
 
-            'tags':                       dict(required=False,
-                                               type='dict'),
+            tags=dict(required=False, type='dict'),
 
-            'wait':                       dict(required=False,
-                                               type='bool',
-                                               default=False),
+            wait=dict(required=False, type='bool', default=False),
 
-            'wait_timeout':               dict(required=False,
-                                               type='int',
-                                               default=300),
-        })
+            wait_timeout=dict(required=False, type='int', default=300),
+        ))
 
     module = AnsibleModule(argument_spec=argument_spec,
                            supports_check_mode=True,
