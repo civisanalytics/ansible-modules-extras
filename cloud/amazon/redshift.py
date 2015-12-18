@@ -412,8 +412,8 @@ def create_cluster(module, redshift):
         if prm:
             params[p] = prm
 
-    if check_cluster_exists(identifier):
-        return describe_clusters(module, redshift)
+    if check_cluster_exists(redshift, identifier):
+        return describe_cluster(module, redshift)
 
     if CHECK_MODE:
         return (True, {})
@@ -425,7 +425,7 @@ def create_cluster(module, redshift):
         module.fail_json(msg=json_response_err_msg(e))
 
     if wait:
-        check_exists = partial(check_cluster_exists, redshift, identifier)
+        check_exists = partial(check_resource_status, redshift, identifier)
         if not wait_for_condition(check_exists, wait_timeout):
             module.fail_json(
                 msg='Timed out while creating cluster "{}"'.format(identifier))
