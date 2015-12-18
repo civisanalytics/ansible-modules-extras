@@ -155,6 +155,8 @@ options:
     required: false
     aliases: ['final_snapshot']
     default: null
+  owner_account:
+    description: Used when command=restore, this is the account of the snapshot to restore from if this is a snapshot you do not own.
     required: false
     default: null
   wait:
@@ -608,6 +610,7 @@ def restore_cluster(module, redshift):
                       'cluster_security_groups',
                       'cluster_subnet_group_name',
                       'elastic_ip',
+                      'owner_account',
                       'port',
                       'preferred_maintenance_window',
                       'publicly_accessible',
@@ -846,6 +849,8 @@ def main():
         wait=dict(type='bool', default=False),
 
         wait_timeout=dict(type='int', default=300),
+
+        owner_account=dict(require=False),
 
         automated_snapshot_retention_period=dict(aliases=['retention_period']),
 

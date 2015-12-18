@@ -119,6 +119,11 @@ options:
         - Dictionary of tags key/values to filter snapshots by
       required: false
       default:  null
+    owner_account:
+      description:
+        - Filter for snapshots owned by this account
+      required: false
+      default: null
     wait:
       description:
         - If set to True, waits for operations to complete
@@ -559,7 +564,8 @@ class RedshiftSnapshotsModule(object):
         """
         sort_by = self.params.get('sort_by')
 
-        list_params = ('snapshot_type', 'start_time', 'end_time')
+        list_params = ('end_time', 'owner_account', 'snapshot_type',
+                       'start_time')
 
         marker = 1  # batch retrieval marker, start at 1 as "default" case,
 
@@ -813,6 +819,8 @@ def main():
             reverse_sort=dict(required=False, type='bool', default=False),
 
             tags=dict(required=False, type='dict'),
+
+            owner_account=dict(required=False),
 
             wait=dict(required=False, type='bool', default=False),
 
