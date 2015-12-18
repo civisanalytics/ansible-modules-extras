@@ -539,7 +539,8 @@ def modify_cluster(module, redshift):
             module.fail_json(
                 msg='Timed out waiting for cluster modification to complete.')
 
-    return(True, _collect_facts(resource))
+    (_, cluster) = describe_cluster(module, redshift)
+    return(True, cluster)
 
 
 def snapshot_cluster(module, redshift):
